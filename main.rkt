@@ -179,19 +179,19 @@
   [(allocₖ Ξ V_f (V_x ...) φ)
    (,(format-symbol "κ_~a" (intern 'κ (term (V_f V_x0 ... φ_0)))) m Ξ (V_x0 ...) φ_0)
    (judgment-holds (lookup Ξ V_f ((V_x0 ...) φ_0)))
-   (judgment-holds (unify (V_x ... φ) (V_x0 ... φ_0) m))]
+   (judgment-holds (⊑/m (V_x ... φ) (V_x0 ... φ_0) m))]
   ;; If application is new, add to `Ξ`
   [(allocₖ Ξ V_f (V_x ...) φ)
    (,(format-symbol "κ_~a" (intern 'κ (term (V_f V_x ... φ)))) () (⊔ Ξ [V_f ↦ ((V_x ...) φ)]) (V_x ...) φ)])
 
 (define-judgment-form λs
   ;; Unification of argument sequences and path-conditions
-  #:contract (unify (V ... φ) (V ... φ) m)
-  #:mode     (unify I         I         O)
-  [(unify-V* () (V_1 ...) (V_2 ...) m)
-   (unify-φ? m φ_1 φ_2)
+  #:contract (⊑/m (V ... φ) (V ... φ) m)
+  #:mode     (⊑/m I         I         O)
+  [(unify-V* () (V_1 ...) (V_2 ...) m) ; syntactically identical up to `m`
+   (φ⊑/m? m φ_1 φ_2)                  ; path-conditions subsumed up to `m`
    -------------------------------------------------------------
-   (unify (V_1 ... φ_1) (V_2 ... φ_2) m)])
+   (⊑/m (V_1 ... φ_1) (V_2 ... φ_2) m)])
 
 (define-judgment-form λs
   ;; Unification of value sequences
@@ -207,24 +207,26 @@
   ;; Unification of values
   #:contract (unify-V m V V m)
   #:mode     (unify-V I I I O)
-  [(unify-V m V V m)]
+  [(unify-V m V V m)
+   (side-condition ,(not (redex-match? λs (• ℓ) (term V))))]
   [(where {_ ... [ℓ_1 ↔ ℓ_2] _ ...} m)
    -------------------------------------------------------------
    (unify-V m (• ℓ_1) (• ℓ_2) m)]
-  [(side-condition ,(not (equal? (term ℓ_1) (term ℓ_2)))) ; avoid duplicating trivial case
-   (where {[ℓ_1* ↔ ℓ_2*] ...} m)
+  [(where {[ℓ_1* ↔ ℓ_2*] ...} m)
    (side-condition ,(not (member (term ℓ_1) (term (ℓ_1* ...)))))
    (side-condition ,(not (member (term ℓ_2) (term (ℓ_2* ...)))))
    -------------------------------------------------------------
-   (unify-V m (• ℓ_1) (• ℓ_2) m)])
+   (unify-V m (• ℓ_1) (• ℓ_2) {[ℓ_1 ↔ ℓ_2] [ℓ_1* ↔ ℓ_2*] ...})])
 
 (define-relation λs
   ;; Check if `φ_1` restricted to `{ℓ_1 ...}` and `φ_2` restricted to {ℓ_2 ...} are identical
   ;; up to renaming {[ℓ_1 ↔ ℓ_2] ...}
-  unify-φ? ⊆ m × φ × φ
-  [(unify-φ? () φ_1 φ_2)]
-  [(unify-φ? ((ℓ_1 ↔ ℓ_2) any ...) φ_1 φ_2)
-   (unify-φ? (any ...) φ_1 φ_2)
+  φ⊑/m? ⊆ m × φ × φ
+  [(φ⊑/m? () φ_1 φ_2)
+   ,(for/and ([(ℓ U) (in-hash (term φ_2))])
+      (equal? U (hash-ref (term φ_1) ℓ #f)))]
+  [(φ⊑/m? ((ℓ_1 ↔ ℓ_2) any ...) φ_1 φ_2)
+   (φ⊑/m? (any ...) ,(hash-remove (term φ_1) (term ℓ_1)) ,(hash-remove (term φ_2) (term ℓ_2)))
    (where U ,(hash-ref (term φ_1) (term ℓ_1)))
    (where U ,(hash-ref (term φ_2) (term ℓ_2)))])
 
